@@ -2,19 +2,22 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { X, Camera, Info, Leaf, TreePine, Flower2 } from 'lucide-react';
+import { X, Camera, Info, Leaf, TreePine, Flower2, Scan, MapPin } from 'lucide-react';
 
 const ARScene = () => {
-  const sceneRef = useRef(null);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
   const [selectedCheckpoint, setSelectedCheckpoint] = useState(null);
   const [arStarted, setArStarted] = useState(false);
   const [cameraPermission, setCameraPermission] = useState(null);
+  const [mapDetected, setMapDetected] = useState(false);
+  const [scanning, setScanning] = useState(false);
 
   const checkpoints = [
     {
       id: 1,
       name: "Fern Valley",
-      position: "-2 0 -3",
+      position: { x: 20, y: 25 },
       plant: {
         name: "Bird's Nest Fern",
         scientific: "Asplenium nidus",
@@ -27,7 +30,7 @@ const ARScene = () => {
     {
       id: 2,
       name: "Bamboo Grove",
-      position: "2 0 -2",
+      position: { x: 70, y: 40 },
       plant: {
         name: "Giant Bamboo",
         scientific: "Dendrocalamus giganteus",
@@ -40,7 +43,7 @@ const ARScene = () => {
     {
       id: 3,
       name: "Orchid Point",
-      position: "0 0 -5",
+      position: { x: 45, y: 15 },
       plant: {
         name: "Wild Orchid",
         scientific: "Vanda hookeriana",
@@ -53,7 +56,7 @@ const ARScene = () => {
     {
       id: 4,
       name: "Dipterocarp Trail",
-      position: "-3 0 -1",
+      position: { x: 35, y: 60 },
       plant: {
         name: "Meranti Tree",
         scientific: "Shorea sp.",
@@ -66,7 +69,7 @@ const ARScene = () => {
     {
       id: 5,
       name: "Pitcher Plant Bog",
-      position: "3 0 -4",
+      position: { x: 80, y: 70 },
       plant: {
         name: "Tropical Pitcher Plant",
         scientific: "Nepenthes rafflesiana",
@@ -79,117 +82,43 @@ const ARScene = () => {
   ];
 
   useEffect(() => {
-    const script1 = document.createElement('script');
-    script1.src = 'https://aframe.io/releases/1.4.0/aframe.min.js';
-    script1.onload = () => {
-      const script2 = document.createElement('script');
-      script2.src = 'https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.min.js';
-      script2.onload = () => {
-        initializeAR();
-      };
-      document.head.appendChild(script2);
-    };
-    document.head.appendChild(script1);
+    if (arStarted) {
+      startCamera();
+    }
+  }, [arStarted]);
 
-    return () => {
-      document.head.removeChild(script1);
-      try {
-        const script2 = document.querySelector('script[src*="aframe-ar"]');
-        if (script2) document.head.removeChild(script2);
-      } catch (e) {}
-    };
-  }, []);
+  useEffect(() => {
+    if (mapDetected) {
+      // Simulate map detection after 3 seconds
+      const timer = setTimeout(() => {
+        setMapDetected(true);
+        setScanning(false);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [scanning]);
 
-  const initializeAR = () => {
-    if (sceneRef.current && window.AFRAME) {
-      sceneRef.current.innerHTML = `
-        <a-scene
-          vr-mode-ui="enabled: false"
-          arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
-          renderer="logarithmicDepthBuffer: true; colorManagement: true;"
-          embedded
-          style="height: 100%; width: 100%;"
-        >
-          <a-assets>
-            <a-asset-item id="tree" src="https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Tree/glTF/Tree.gltf"></a-asset-item>
-          </a-assets>
-          
-          <a-marker preset="hiro" id="marker">
-            <!-- 3D Map Base -->
-            <a-plane 
-              position="0 0 0" 
-              rotation="-90 0 0" 
-              width="8" 
-              height="6" 
-              color="#2d5a27" 
-              opacity="0.8"
-              shadow="receive: true"
-            ></a-plane>
-            
-            <!-- Trail lines -->
-            <a-entity id="trails">
-              <a-cylinder position="-1 0.05 -2" radius="0.05" height="3" rotation="0 0 45" color="#8b4513"></a-cylinder>
-              <a-cylinder position="1 0.05 -3" radius="0.05" height="2.5" rotation="0 0 -30" color="#8b4513"></a-cylinder>
-              <a-cylinder position="0 0.05 -1" radius="0.05" height="2" rotation="0 0 90" color="#8b4513"></a-cylinder>
-            </a-entity>
-            
-            <!-- Checkpoint markers -->
-            ${checkpoints.map(checkpoint => `
-              <a-entity position="${checkpoint.position}" class="checkpoint" data-checkpoint-id="${checkpoint.id}">
-                <a-cylinder 
-                  position="0 0.5 0" 
-                  radius="0.3" 
-                  height="1" 
-                  color="${checkpoint.color}"
-                  animation="property: rotation; to: 0 360 0; loop: true; dur: 4000"
-                  shadow="cast: true"
-                ></a-cylinder>
-                <a-sphere 
-                  position="0 1.2 0" 
-                  radius="0.2" 
-                  color="white"
-                  animation="property: position; to: 0 1.5 0; dir: alternate; dur: 1500; loop: true"
-                ></a-sphere>
-                <a-text 
-                  position="0 1.8 0" 
-                  value="${checkpoint.name}" 
-                  align="center" 
-                  color="white"
-                  scale="1.5 1.5 1.5"
-                  billboard="true"
-                ></a-text>
-                <!-- Simple plant representation -->
-                <a-cone 
-                  position="0 0.1 0" 
-                  radius-bottom="0.2" 
-                  radius-top="0.05" 
-                  height="0.4" 
-                  color="#2d5a27"
-                  shadow="cast: true"
-                ></a-cone>
-              </a-entity>
-            `).join('')}
-            
-            <!-- Ambient lighting -->
-            <a-light type="ambient" color="#404040" intensity="0.5"></a-light>
-            <a-light type="directional" position="2 4 3" color="#ffffff" intensity="0.8" shadow="cast: true"></a-light>
-          </a-marker>
-          
-          <a-entity camera></a-entity>
-        </a-scene>
-      `;
-
-      // Add click event listeners to checkpoints
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' }
+      });
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+      }
+      
+      // Simulate map detection
+      setScanning(true);
       setTimeout(() => {
-        const checkpointElements = document.querySelectorAll('.checkpoint');
-        checkpointElements.forEach(element => {
-          element.addEventListener('click', (e) => {
-            const checkpointId = parseInt(e.target.closest('.checkpoint').getAttribute('data-checkpoint-id'));
-            const checkpoint = checkpoints.find(cp => cp.id === checkpointId);
-            setSelectedCheckpoint(checkpoint);
-          });
-        });
-      }, 1000);
+        setMapDetected(true);
+        setScanning(false);
+      }, 3000);
+      
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      setCameraPermission(false);
     }
   };
 
