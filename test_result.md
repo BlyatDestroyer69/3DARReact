@@ -102,7 +102,7 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: "Test the AR Adventure backend API functionality for session management, plant and checkpoint data, discovery system, progress tracking, trail management, and settings management."
+user_problem_statement: "Test the AR Adventure frontend application comprehensively but carefully. The app is a fully integrated AR experience for plant discovery at Bukit Kiara."
 
 backend:
   - task: "Session Management"
@@ -177,20 +177,106 @@ backend:
         agent: "testing"
         comment: "Successfully tested settings management. The API correctly returns default AR settings for a session and allows updating settings. Settings persistence is verified after updates."
 
+frontend:
+  - task: "Landing Page & Map Setup"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/components/MapUploader.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "Initial setup for testing the landing page and map setup functionality."
+
+  - task: "Session Management & Progress"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/hooks/useSession.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "Initial setup for testing session management and progress tracking in the frontend."
+
+  - task: "AR Experience Flow"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/components/ARScene.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "Initial setup for testing the AR experience flow."
+
+  - task: "Checkpoint Discovery System"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/components/ARScene.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "Initial setup for testing the checkpoint discovery system in the AR experience."
+
+  - task: "Plant Information Modals"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/components/ARScene.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "Initial setup for testing plant information modals in the AR experience."
+
+  - task: "Progress & Achievement System"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/components/ARScene.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "Initial setup for testing the progress and achievement system in the frontend."
+
+  - task: "UI/UX Elements"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/App.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "Initial setup for testing UI/UX elements across the application."
+
 metadata:
   created_by: "testing_agent"
   version: "1.0"
   test_sequence: 1
-  run_ui: false
+  run_ui: true
 
 test_plan:
   current_focus:
-    - "Session Management"
-    - "Plant and Checkpoint Data"
-    - "Discovery System"
-    - "Progress Tracking"
-    - "Trail Management"
-    - "Settings Management"
+    - "Landing Page & Map Setup"
+    - "Session Management & Progress"
+    - "AR Experience Flow"
+    - "Checkpoint Discovery System"
+    - "Plant Information Modals"
+    - "Progress & Achievement System"
+    - "UI/UX Elements"
   stuck_tasks: []
   test_all: true
   test_priority: "high_first"
@@ -198,3 +284,5 @@ test_plan:
 agent_communication:
   - agent: "testing"
     message: "I've completed comprehensive testing of all backend API functionality for the AR Adventure app. All tests passed successfully. The backend correctly handles session management, plant and checkpoint data, discovery system, progress tracking, trail management, and settings management. The API is working as expected and ready for frontend integration."
+  - agent: "testing"
+    message: "Now I'll be testing the frontend application to ensure all components are working correctly. I'll focus on the landing page, session management, AR experience flow, checkpoint discovery, plant information modals, progress tracking, and UI/UX elements."
