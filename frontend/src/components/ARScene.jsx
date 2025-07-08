@@ -127,7 +127,7 @@ const ARScene = () => {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       setCameraPermission(true);
       setArStarted(true);
-      // Stop the stream as AR.js will handle camera access
+      // Stop the stream as we'll restart it in AR mode
       stream.getTracks().forEach(track => track.stop());
     } catch (error) {
       console.error('Camera permission denied:', error);
@@ -199,14 +199,28 @@ const ARScene = () => {
 
   return (
     <div className="relative w-full h-screen bg-black overflow-hidden">
-      {/* AR Scene Container */}
-      <div ref={sceneRef} className="absolute inset-0 z-10" />
+      {/* Camera Feed */}
+      <video
+        ref={videoRef}
+        className="absolute inset-0 w-full h-full object-cover"
+        autoPlay
+        playsInline
+        muted
+      />
+      
+      {/* AR Overlay Canvas */}
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 w-full h-full pointer-events-none"
+      />
       
       {/* UI Overlay */}
       <div className="absolute top-4 left-4 right-4 z-20 flex justify-between items-start">
         <div className="bg-black/50 backdrop-blur-sm rounded-lg p-3">
           <h1 className="text-white font-bold text-lg">AR Adventure</h1>
-          <p className="text-white/80 text-sm">Scan the Bukit Kiara map</p>
+          <p className="text-white/80 text-sm">
+            {scanning ? 'Scanning map...' : mapDetected ? 'Map detected!' : 'Point at the map'}
+          </p>
         </div>
         
         <Button
@@ -219,11 +233,80 @@ const ARScene = () => {
         </Button>
       </div>
       
+      {/* Scanning Indicator */}
+      {scanning && (
+        <div className="absolute inset-0 flex items-center justify-center z-10">
+          <div className="bg-black/50 backdrop-blur-sm rounded-lg p-6 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-3"></div>
+            <p className="text-white text-sm">Scanning for map...</p>
+          </div>
+        </div>
+      )}
+      
+      {/* Scanning Frame */}
+      {scanning && (
+        <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+          <div className="border-2 border-white/50 rounded-lg w-80 h-60 relative">
+            <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-green-400 rounded-tl-lg"></div>
+            <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-green-400 rounded-tr-lg"></div>
+            <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-green-400 rounded-bl-lg"></div>
+            <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-green-400 rounded-br-lg"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Scan className="w-8 h-8 text-white/70 animate-pulse" />
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* AR Checkpoints Overlay */}
+      {mapDetected && (
+        <div className="absolute inset-0 z-15 pointer-events-none">
+          {checkpoints.map((checkpoint) => (
+            <div
+              key={checkpoint.id}
+              className="absolute pointer-events-auto cursor-pointer transform -translate-x-1/2 -translate-y-1/2"
+              style={{
+                left: `${checkpoint.position.x}%`,
+                top: `${checkpoint.position.y}%`,
+              }}
+              onClick={() => setSelectedCheckpoint(checkpoint)}
+            >
+              <div className="relative">
+                {/* Animated pulse ring */}
+                <div 
+                  className="absolute inset-0 rounded-full animate-ping"
+                  style={{ backgroundColor: checkpoint.color + '40' }}
+                ></div>
+                
+                {/* Main checkpoint marker */}
+                <div 
+                  className="w-12 h-12 rounded-full shadow-lg border-2 border-white flex items-center justify-center relative z-10"
+                  style={{ backgroundColor: checkpoint.color }}
+                >
+                  <MapPin className="w-6 h-6 text-white" />
+                </div>
+                
+                {/* Checkpoint label */}
+                <div className="absolute top-14 left-1/2 transform -translate-x-1/2 whitespace-nowrap">
+                  <div className="bg-black/80 backdrop-blur-sm text-white px-2 py-1 rounded text-xs font-medium">
+                    {checkpoint.name}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      
       {/* Instructions */}
       <div className="absolute bottom-4 left-4 right-4 z-20">
         <div className="bg-black/50 backdrop-blur-sm rounded-lg p-3 text-center">
           <p className="text-white text-sm">
-            🎯 Point camera at the map • 👆 Tap checkpoints to learn about plants
+            {!mapDetected ? (
+              <>🎯 Point camera at the Bukit Kiara map to reveal checkpoints</>
+            ) : (
+              <>👆 Tap the colored pins to discover plants • 🌿 {checkpoints.length} species to find</>
+            )}
           </p>
         </div>
       </div>
