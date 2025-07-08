@@ -2,9 +2,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { X, Camera, Info, Leaf, TreePine, Flower2, Scan, MapPin } from 'lucide-react';
+import { X, Camera, Info, Leaf, TreePine, Flower2, Scan, MapPin, Trophy, Loader2 } from 'lucide-react';
+import { useSession } from '../hooks/useSession';
+import { getCheckpoints, discoverCheckpoint, getProgress } from '../services/api';
+import { toast } from 'sonner';
 
 const ARScene = () => {
+  const { session } = useSession();
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [selectedCheckpoint, setSelectedCheckpoint] = useState(null);
@@ -12,74 +16,17 @@ const ARScene = () => {
   const [cameraPermission, setCameraPermission] = useState(null);
   const [mapDetected, setMapDetected] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [checkpoints, setCheckpoints] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [progress, setProgress] = useState(null);
+  const [discoveryAnimation, setDiscoveryAnimation] = useState(null);
 
-  const checkpoints = [
-    {
-      id: 1,
-      name: "Fern Valley",
-      position: { x: 20, y: 25 },
-      plant: {
-        name: "Bird's Nest Fern",
-        scientific: "Asplenium nidus",
-        description: "A large epiphytic fern native to tropical regions. Its distinctive nest-like shape helps collect water and organic debris.",
-        facts: ["Can grow up to 1.5 meters wide", "Epiphytic - grows on other plants", "Popular as houseplant"],
-        rarity: "Common"
-      },
-      color: "#22c55e"
-    },
-    {
-      id: 2,
-      name: "Bamboo Grove",
-      position: { x: 70, y: 40 },
-      plant: {
-        name: "Giant Bamboo",
-        scientific: "Dendrocalamus giganteus",
-        description: "One of the largest bamboo species in the world. It can grow extremely fast and is used for construction.",
-        facts: ["Can grow up to 3 feet per day", "Reaches heights of 100+ feet", "Stronger than steel in tensile strength"],
-        rarity: "Uncommon"
-      },
-      color: "#eab308"
-    },
-    {
-      id: 3,
-      name: "Orchid Point",
-      position: { x: 45, y: 15 },
-      plant: {
-        name: "Wild Orchid",
-        scientific: "Vanda hookeriana",
-        description: "A beautiful epiphytic orchid species endemic to Southeast Asia. Known for its fragrant flowers.",
-        facts: ["Blooms year-round", "Requires high humidity", "Protected species"],
-        rarity: "Rare"
-      },
-      color: "#a855f7"
-    },
-    {
-      id: 4,
-      name: "Dipterocarp Trail",
-      position: { x: 35, y: 60 },
-      plant: {
-        name: "Meranti Tree",
-        scientific: "Shorea sp.",
-        description: "A tall tropical hardwood tree, part of the dipterocarp family. Important for timber and ecosystem.",
-        facts: ["Can live over 100 years", "Provides canopy shelter", "Seeds have wing-like structures"],
-        rarity: "Common"
-      },
-      color: "#dc2626"
-    },
-    {
-      id: 5,
-      name: "Pitcher Plant Bog",
-      position: { x: 80, y: 70 },
-      plant: {
-        name: "Tropical Pitcher Plant",
-        scientific: "Nepenthes rafflesiana",
-        description: "A carnivorous plant with modified leaves that form pitcher-shaped traps to catch insects.",
-        facts: ["Carnivorous plant", "Pitchers can hold 200ml of water", "Endemic to Southeast Asia"],
-        rarity: "Rare"
-      },
-      color: "#f59e0b"
+  useEffect(() => {
+    if (session) {
+      loadCheckpoints();
+      loadProgress();
     }
-  ];
+  }, [session]);
 
   useEffect(() => {
     if (arStarted) {
@@ -87,16 +34,27 @@ const ARScene = () => {
     }
   }, [arStarted]);
 
-  useEffect(() => {
-    if (mapDetected) {
-      // Simulate map detection after 3 seconds
-      const timer = setTimeout(() => {
-        setMapDetected(true);
-        setScanning(false);
-      }, 3000);
-      return () => clearTimeout(timer);
+  const loadCheckpoints = async () => {
+    try {
+      setLoading(true);
+      const data = await getCheckpoints('trail_1', session?.id);
+      setCheckpoints(data);
+    } catch (error) {
+      console.error('Error loading checkpoints:', error);
+      toast.error('Failed to load checkpoints');
+    } finally {
+      setLoading(false);
     }
-  }, [scanning]);
+  };
+
+  const loadProgress = async () => {
+    try {
+      const progressData = await getProgress(session.id);
+      setProgress(progressData);
+    } catch (error) {
+      console.error('Error loading progress:', error);
+    }
+  };
 
   const startCamera = async () => {
     try {
@@ -114,11 +72,77 @@ const ARScene = () => {
       setTimeout(() => {
         setMapDetected(true);
         setScanning(false);
+        toast.success('Map detected! Tap the checkpoints to discover plants.');
       }, 3000);
       
     } catch (error) {
       console.error('Error accessing camera:', error);
       setCameraPermission(false);
+      toast.error('Camera access denied. Please enable camera permissions.');
+    }
+  };
+
+  const handleCheckpointClick = async (checkpoint) => {
+    if (!session) return;
+    
+    if (checkpoint.discovered) {
+      setSelectedCheckpoint(checkpoint);
+      return;
+    }
+
+    try {
+      setDiscoveryAnimation(checkpoint.id);
+      const result = await discoverCheckpoint(session.id, checkpoint.id);
+      
+      if (result.success) {
+        // Update checkpoint as discovered
+        setCheckpoints(prev => 
+          prev.map(cp => 
+            cp.id === checkpoint.id 
+              ? { ...cp, discovered: true }
+              : cp
+          )
+        );
+        
+        // Show success message
+        toast.success(result.message, {
+          description: `You discovered ${checkpoint.plant.name}!`,
+          duration: 5000,
+        });
+        
+        // Show achievement if unlocked
+        if (result.achievement_unlocked) {
+          setTimeout(() => {
+            toast.success('Achievement Unlocked!', {
+              description: `${result.achievement_unlocked.icon} ${result.achievement_unlocked.name}`,
+              duration: 6000,
+            });
+          }, 1500);
+        }
+        
+        // Update progress
+        if (result.progress) {
+          setProgress(prev => ({
+            ...prev,
+            total_discoveries: result.progress.plants_collected,
+            plants_collected: result.progress.plants_collected,
+            achievements_count: result.progress.achievements_unlocked.length
+          }));
+        }
+        
+        // Show plant information
+        setTimeout(() => {
+          setSelectedCheckpoint({ ...checkpoint, discovered: true });
+        }, 2000);
+        
+      } else {
+        toast.info(result.message);
+      }
+    } catch (error) {
+      console.error('Error discovering checkpoint:', error);
+      toast.error('Failed to record discovery');
+    } finally {
+      setTimeout(() => setDiscoveryAnimation(null), 3000);
     }
   };
 
@@ -140,6 +164,7 @@ const ARScene = () => {
       case 'Common': return 'bg-green-500';
       case 'Uncommon': return 'bg-yellow-500';
       case 'Rare': return 'bg-purple-500';
+      case 'Legendary': return 'bg-red-500';
       default: return 'bg-gray-500';
     }
   };
@@ -150,6 +175,17 @@ const ARScene = () => {
     if (name.includes('Orchid') || name.includes('Pitcher')) return <Flower2 className="w-4 h-4" />;
     return <Leaf className="w-4 h-4" />;
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-900 via-green-800 to-green-700 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-white mx-auto mb-4" />
+          <p className="text-white">Loading AR Adventure...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!arStarted) {
     return (
@@ -165,6 +201,26 @@ const ARScene = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Progress Summary */}
+            {progress && (
+              <div className="bg-green-50 rounded-lg p-3">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm font-medium text-green-800">Progress</span>
+                  <span className="text-sm text-green-600">{progress.total_discoveries}/{progress.total_checkpoints}</span>
+                </div>
+                <div className="w-full bg-green-200 rounded-full h-2">
+                  <div 
+                    className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${progress.completion_percentage}%` }}
+                  ></div>
+                </div>
+                <div className="flex justify-between mt-2 text-xs text-green-600">
+                  <span>🌱 {progress.plants_collected} plants</span>
+                  <span>🏆 {progress.achievements_count} achievements</span>
+                </div>
+              </div>
+            )}
+            
             <div className="text-center text-sm text-gray-600">
               <p className="mb-2">🗺️ Point your camera at the Bukit Kiara map</p>
               <p className="mb-2">🌿 Discover interactive plant checkpoints</p>
@@ -221,6 +277,11 @@ const ARScene = () => {
           <p className="text-white/80 text-sm">
             {scanning ? 'Scanning map...' : mapDetected ? 'Map detected!' : 'Point at the map'}
           </p>
+          {progress && (
+            <div className="text-white/70 text-xs mt-1">
+              {progress.total_discoveries}/{progress.total_checkpoints} discovered
+            </div>
+          )}
         </div>
         
         <Button
@@ -269,27 +330,47 @@ const ARScene = () => {
                 left: `${checkpoint.position.x}%`,
                 top: `${checkpoint.position.y}%`,
               }}
-              onClick={() => setSelectedCheckpoint(checkpoint)}
+              onClick={() => handleCheckpointClick(checkpoint)}
             >
               <div className="relative">
+                {/* Discovery Animation */}
+                {discoveryAnimation === checkpoint.id && (
+                  <div className="absolute inset-0 -m-4">
+                    <div className="w-20 h-20 rounded-full bg-green-400/30 animate-ping"></div>
+                    <div className="absolute inset-0 w-20 h-20 rounded-full bg-green-400/20 animate-ping" style={{animationDelay: '0.5s'}}></div>
+                  </div>
+                )}
+                
                 {/* Animated pulse ring */}
-                <div 
-                  className="absolute inset-0 rounded-full animate-ping"
-                  style={{ backgroundColor: checkpoint.color + '40' }}
-                ></div>
+                {!checkpoint.discovered && (
+                  <div 
+                    className="absolute inset-0 rounded-full animate-ping"
+                    style={{ backgroundColor: checkpoint.color + '40' }}
+                  ></div>
+                )}
                 
                 {/* Main checkpoint marker */}
                 <div 
-                  className="w-12 h-12 rounded-full shadow-lg border-2 border-white flex items-center justify-center relative z-10"
-                  style={{ backgroundColor: checkpoint.color }}
+                  className={`w-12 h-12 rounded-full shadow-lg border-2 border-white flex items-center justify-center relative z-10 ${
+                    checkpoint.discovered ? 'bg-green-500' : ''
+                  }`}
+                  style={{ 
+                    backgroundColor: checkpoint.discovered ? '#22c55e' : checkpoint.color 
+                  }}
                 >
-                  <MapPin className="w-6 h-6 text-white" />
+                  {checkpoint.discovered ? (
+                    <Trophy className="w-6 h-6 text-white" />
+                  ) : (
+                    <MapPin className="w-6 h-6 text-white" />
+                  )}
                 </div>
                 
                 {/* Checkpoint label */}
                 <div className="absolute top-14 left-1/2 transform -translate-x-1/2 whitespace-nowrap">
-                  <div className="bg-black/80 backdrop-blur-sm text-white px-2 py-1 rounded text-xs font-medium">
-                    {checkpoint.name}
+                  <div className={`backdrop-blur-sm text-white px-2 py-1 rounded text-xs font-medium ${
+                    checkpoint.discovered ? 'bg-green-500/80' : 'bg-black/80'
+                  }`}>
+                    {checkpoint.discovered ? '✓ ' : ''}{checkpoint.name}
                   </div>
                 </div>
               </div>
@@ -305,7 +386,7 @@ const ARScene = () => {
             {!mapDetected ? (
               <>🎯 Point camera at the Bukit Kiara map to reveal checkpoints</>
             ) : (
-              <>👆 Tap the colored pins to discover plants • 🌿 {checkpoints.length} species to find</>
+              <>👆 Tap the pins to discover plants • 🌿 {checkpoints.filter(c => !c.discovered).length} left to find</>
             )}
           </p>
         </div>
@@ -324,9 +405,14 @@ const ARScene = () => {
                     <Badge className={`${getRarityColor(selectedCheckpoint.plant.rarity)} text-white`}>
                       {selectedCheckpoint.plant.rarity}
                     </Badge>
+                    {selectedCheckpoint.discovered && (
+                      <Badge className="bg-green-500 text-white">
+                        Discovered
+                      </Badge>
+                    )}
                   </div>
                   <CardDescription className="italic text-sm">
-                    {selectedCheckpoint.plant.scientific}
+                    {selectedCheckpoint.plant.scientific_name}
                   </CardDescription>
                 </div>
                 <Button
@@ -360,6 +446,17 @@ const ARScene = () => {
                     </li>
                   ))}
                 </ul>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 pt-2 border-t text-xs text-gray-500">
+                <div>
+                  <span className="font-medium">Habitat:</span>
+                  <p>{selectedCheckpoint.plant.habitat}</p>
+                </div>
+                <div>
+                  <span className="font-medium">Conservation:</span>
+                  <p>{selectedCheckpoint.plant.conservation_status}</p>
+                </div>
               </div>
               
               <div className="pt-2 border-t">
